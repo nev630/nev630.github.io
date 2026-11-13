@@ -12,5 +12,17 @@ const PORTAL_APPS = [
     tags: ['Clash Royale', 'Dashboard', 'API'],
     status: 'Active',
     featured: true
+  },
+  {
+    id: 'pw-generator',
+    name: 'PW Generator',
+    description: '안전하고 강력한 비밀번호를 빠르게 생성하고 복사할 수 있는 보안 유틸리티 웹 앱',
+    category: 'Utility',
+    icon: '🔐',
+    url: 'https://nev630.github.io/pw-generator/',
+    repoUrl: 'https://github.com/nev630/pw-generator',
+    tags: ['Security', 'Password', 'Utility'],
+    status: 'Active',
+    featured: false
   }
 ];
