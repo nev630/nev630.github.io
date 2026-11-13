@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const categoryTabsEl = document.getElementById('category-tabs');
   const appCountEl = document.getElementById('app-count');
   const hudWrapper = document.getElementById('hud-wrapper');
-  const hudIcon = document.getElementById('hud-icon');
+  const hudCode = document.getElementById('hud-code');
   const hudCategory = document.getElementById('hud-category');
   const hudStatus = document.getElementById('hud-status');
   const hudTitle = document.getElementById('hud-title');
@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let pinnedIds = JSON.parse(localStorage.getItem('portal_pins') || '[]');
   let currentApps = [];
   let selectedIndex = 0;
+  let carouselStep = 0; // 연속 회전용 언래핑(unwrapped) 스텝 인덱스
 
   // 1. 시스템 다크 모드 자동 연동
   const darkMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -31,24 +32,20 @@ document.addEventListener('DOMContentLoaded', () => {
     isDarkMode = dark;
     htmlEl.classList.toggle('dark', dark);
     if (scene) {
-      scene.background = new THREE.Color(dark ? 0x020617 : 0xf8fafc);
-      scene.fog = new THREE.FogExp2(dark ? 0x020617 : 0xf8fafc, 0.022);
+      scene.background = new THREE.Color(dark ? 0x020617 : 0xf1f5f9);
+      scene.fog = new THREE.FogExp2(dark ? 0x020617 : 0xf1f5f9, 0.02);
     }
-    if (coreWireMaterial) {
-      coreWireMaterial.color.setHex(dark ? 0x6366f1 : 0x4f46e5);
-    }
-    if (particleMaterial) {
-      particleMaterial.color.setHex(dark ? 0x818cf8 : 0x6366f1);
-    }
+    rebuildVoxelCore();
+    rebuildVoxelParticles();
     rebuildCards();
   }
   htmlEl.classList.toggle('dark', isDarkMode);
   darkMediaQuery.addEventListener('change', e => syncSystemTheme(e.matches));
 
-  // 2. Three.js 씬 초기화
+  // 2. Three.js Voxel 씬 초기화
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(isDarkMode ? 0x020617 : 0xf8fafc);
-  scene.fog = new THREE.FogExp2(isDarkMode ? 0x020617 : 0xf8fafc, 0.022);
+  scene.background = new THREE.Color(isDarkMode ? 0x020617 : 0xf1f5f9);
+  scene.fog = new THREE.FogExp2(isDarkMode ? 0x020617 : 0xf1f5f9, 0.02);
 
   const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 150);
 
@@ -56,43 +53,93 @@ document.addEventListener('DOMContentLoaded', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-  // 조명
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
+  // Voxel 음영용 조명
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
   scene.add(ambientLight);
-  const dirLight = new THREE.DirectionalLight(0x818cf8, 1.2);
-  dirLight.position.set(4, 6, 5);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+  dirLight.position.set(5, 8, 6);
   scene.add(dirLight);
+  const rimLight = new THREE.DirectionalLight(0x818cf8, 0.6);
+  rimLight.position.set(-5, -4, -3);
+  scene.add(rimLight);
 
-  // 배경 3D 코어 오브제
-  const coreGeo = new THREE.IcosahedronGeometry(1.15, 1);
-  const coreWireMaterial = new THREE.MeshBasicMaterial({
-    color: isDarkMode ? 0x6366f1 : 0x4f46e5,
-    wireframe: true,
-    transparent: true,
-    opacity: 0.22
-  });
-  const coreMesh = new THREE.Mesh(coreGeo, coreWireMaterial);
-  coreMesh.position.set(0, 0.15, -1.2);
-  scene.add(coreMesh);
+  // 배경 3D Voxel 코어 클러스터
+  const coreGroup = new THREE.Group();
+  coreGroup.position.set(0, 0.25, -1.8);
+  scene.add(coreGroup);
 
-  // 배경 3D 파티클
-  const particleCount = 180;
-  const particlePositions = new Float32Array(particleCount * 3);
-  for (let i = 0; i < particleCount; i++) {
-    particlePositions[i * 3] = (Math.random() - 0.5) * 24;
-    particlePositions[i * 3 + 1] = (Math.random() - 0.5) * 16;
-    particlePositions[i * 3 + 2] = (Math.random() - 0.5) * 20 - 2;
+  function rebuildVoxelCore() {
+    while (coreGroup.children.length > 0) {
+      const child = coreGroup.children[0];
+      child.geometry?.dispose();
+      child.material?.dispose();
+      coreGroup.remove(child);
+    }
+
+    const palette = isDarkMode
+      ? [0x312e81, 0x4338ca, 0x6366f1, 0x1e293b]
+      : [0xc7d2fe, 0x818cf8, 0x4f46e5, 0xe2e8f0];
+    const boxGeo = new THREE.BoxGeometry(0.42, 0.42, 0.42);
+    const edgeGeo = new THREE.EdgesGeometry(boxGeo);
+    const edgeMat = new THREE.LineBasicMaterial({
+      color: isDarkMode ? 0x818cf8 : 0x312e81,
+      transparent: true,
+      opacity: 0.35
+    });
+
+    const offsets = [
+      [0, 0, 0], [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1],
+      [1, 1, 0], [-1, -1, 0], [1, 0, -1], [-1, 0, 1]
+    ];
+
+    offsets.forEach(([ox, oy, oz], idx) => {
+      const mat = new THREE.MeshLambertMaterial({
+        color: palette[idx % palette.length],
+        transparent: true,
+        opacity: 0.45
+      });
+      const cube = new THREE.Mesh(boxGeo, mat);
+      cube.position.set(ox * 0.46, oy * 0.46, oz * 0.46);
+      const wire = new THREE.LineSegments(edgeGeo, edgeMat);
+      cube.add(wire);
+      coreGroup.add(cube);
+    });
   }
-  const particleGeo = new THREE.BufferGeometry();
-  particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-  const particleMaterial = new THREE.PointsMaterial({
-    color: isDarkMode ? 0x818cf8 : 0x6366f1,
-    size: 0.065,
-    transparent: true,
-    opacity: 0.55
-  });
-  const particles = new THREE.Points(particleGeo, particleMaterial);
-  scene.add(particles);
+
+  // 배경 떠다니는 Voxel 큐브 파티클
+  const voxelParticleGroup = new THREE.Group();
+  scene.add(voxelParticleGroup);
+  let voxelParticles = [];
+
+  function rebuildVoxelParticles() {
+    voxelParticles.forEach(p => {
+      p.geometry.dispose();
+      p.material.dispose();
+      voxelParticleGroup.remove(p);
+    });
+    voxelParticles = [];
+
+    const pGeo = new THREE.BoxGeometry(0.14, 0.14, 0.14);
+    const pColors = isDarkMode ? [0x6366f1, 0x38bdf8, 0x334155] : [0x6366f1, 0x818cf8, 0x94a3b8];
+
+    for (let i = 0; i < 65; i++) {
+      const mat = new THREE.MeshLambertMaterial({
+        color: pColors[i % pColors.length],
+        transparent: true,
+        opacity: 0.55
+      });
+      const cube = new THREE.Mesh(pGeo, mat);
+      cube.position.set(
+        (Math.random() - 0.5) * 22,
+        (Math.random() - 0.5) * 14,
+        (Math.random() - 0.5) * 18 - 3
+      );
+      cube.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+      cube.userData = { speed: 0.3 + Math.random() * 0.6 };
+      voxelParticleGroup.add(cube);
+      voxelParticles.push(cube);
+    }
+  }
 
   // 카드 캐러셀 그룹
   const carouselGroup = new THREE.Group();
@@ -104,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let pointerX = 0;
   let pointerY = 0;
 
-  // 반응형 카메라 프레이밍 (모바일 세로 화면에서 카드가 잘리지 않도록 거리 자동 조절)
+  // 반응형 카메라 프레이밍
   function updateCameraFraming() {
     const aspect = window.innerWidth / window.innerHeight;
     camera.aspect = aspect;
@@ -120,62 +167,73 @@ document.addEventListener('DOMContentLoaded', () => {
     carouselGroup.position.set(0, aspect < 0.8 ? 0.65 : 0.25, 0);
   }
 
-  // 3. CanvasTexture로 선명한 3D 앱 카드 텍스처 생성
+  // 3. Voxel 스타일 2D 텍스처 생성 (둥근 모서리/이모티콘 제거)
   function createCardTexture(app, isSelected) {
     const c = document.createElement('canvas');
     c.width = 720;
     c.height = 460;
     const ctx = c.getContext('2d');
 
-    // 배경 카드
+    // 하드 픽셀 오프셋 그림자
+    ctx.fillStyle = isDarkMode ? '#312e81' : '#0f172a';
+    ctx.fillRect(22, 22, 686, 426);
+
+    // 메인 Voxel 카드 면
     ctx.fillStyle = isDarkMode ? '#0f172a' : '#ffffff';
-    roundRect(ctx, 12, 12, 696, 436, 36);
-    ctx.fill();
+    ctx.fillRect(10, 10, 686, 426);
 
-    // 테두리
-    ctx.lineWidth = isSelected ? 6 : 3;
-    ctx.strokeStyle = isSelected ? '#6366f1' : isDarkMode ? '#1e293b' : '#e2e8f0';
-    roundRect(ctx, 12, 12, 696, 436, 36);
-    ctx.stroke();
+    // 굵은 직각 테두리
+    ctx.lineWidth = isSelected ? 8 : 4;
+    ctx.strokeStyle = isSelected ? '#6366f1' : isDarkMode ? '#334155' : '#0f172a';
+    ctx.strokeRect(10, 10, 686, 426);
 
-    // 아이콘 박스
-    ctx.fillStyle = isDarkMode ? '#1e1b4b' : '#eef2ff';
-    roundRect(ctx, 48, 48, 96, 96, 24);
-    ctx.fill();
+    // 상단 Voxel 그리드 악센트 바
+    ctx.fillStyle = isSelected ? '#6366f1' : isDarkMode ? '#1e293b' : '#e2e8f0';
+    ctx.fillRect(10, 10, 686, 18);
 
-    ctx.font = '52px sans-serif';
+    // 코드 배지 박스 (이모티콘 대체)
+    ctx.fillStyle = '#4f46e5';
+    ctx.fillRect(48, 56, 84, 84);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = isDarkMode ? '#a5b4fc' : '#0f172a';
+    ctx.strokeRect(48, 56, 84, 84);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 34px ui-monospace, monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(app.icon || '🚀', 96, 98);
+    ctx.fillText(app.code || 'APP', 90, 100);
 
     // 카테고리
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillStyle = '#6366f1';
-    ctx.font = 'bold 24px sans-serif';
-    ctx.fillText(app.category.toUpperCase(), 168, 56);
+    ctx.font = 'bold 22px ui-monospace, monospace';
+    ctx.fillText(app.category.toUpperCase(), 156, 60);
 
     // 제목
     ctx.fillStyle = isDarkMode ? '#f8fafc' : '#0f172a';
     ctx.font = 'bold 34px sans-serif';
-    ctx.fillText(truncateText(ctx, app.name, 480), 168, 92);
+    ctx.fillText(truncateText(ctx, app.name, 500), 156, 94);
 
     // 설명
     ctx.fillStyle = isDarkMode ? '#94a3b8' : '#475569';
     ctx.font = '24px sans-serif';
-    wrapText(ctx, app.description, 48, 178, 624, 34, 3);
+    wrapText(ctx, app.description, 48, 174, 610, 34, 3);
 
-    // 태그
+    // 직각 Voxel 태그
     let tagX = 48;
-    const tagY = 340;
-    ctx.font = 'bold 20px sans-serif';
+    const tagY = 336;
+    ctx.font = 'bold 20px ui-monospace, monospace';
     (app.tags || []).slice(0, 4).forEach(tag => {
-      const w = ctx.measureText(tag).width + 28;
+      const w = ctx.measureText(tag).width + 26;
       ctx.fillStyle = isDarkMode ? '#1e293b' : '#f1f5f9';
-      roundRect(ctx, tagX, tagY, w, 40, 12);
-      ctx.fill();
-      ctx.fillStyle = isDarkMode ? '#cbd5e1' : '#334155';
-      ctx.fillText(tag, tagX + 14, tagY + 9);
+      ctx.fillRect(tagX, tagY, w, 40);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = isDarkMode ? '#475569' : '#0f172a';
+      ctx.strokeRect(tagX, tagY, w, 40);
+      ctx.fillStyle = isDarkMode ? '#e2e8f0' : '#0f172a';
+      ctx.fillText(tag, tagX + 13, tagY + 10);
       tagX += w + 12;
     });
 
@@ -183,16 +241,6 @@ document.addEventListener('DOMContentLoaded', () => {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 4;
     return tex;
-  }
-
-  function roundRect(ctx, x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
   }
 
   function truncateText(ctx, text, maxW) {
@@ -227,12 +275,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // 4. 3D 카드 배치 및 갱신
+  // 4. 두께가 있는 3D Voxel 카드 배치
   function rebuildCards() {
     cardMeshes.forEach(m => {
       m.geometry.dispose();
-      m.material.map?.dispose();
-      m.material.dispose();
+      if (Array.isArray(m.material)) {
+        m.material.forEach(mat => {
+          mat.map?.dispose();
+          mat.dispose();
+        });
+      }
       carouselGroup.remove(m);
     });
     cardMeshes = [];
@@ -241,12 +293,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (count === 0) return;
 
     const radius = count === 1 ? 0 : Math.max(2.8, count * 0.85);
-    const cardGeo = new THREE.PlaneGeometry(3.4, 2.18);
+    const cardGeo = new THREE.BoxGeometry(3.4, 2.18, 0.14);
+    const sideColor = isDarkMode ? 0x312e81 : 0x1e293b;
 
     currentApps.forEach((app, idx) => {
-      const tex = createCardTexture(app, idx === selectedIndex);
-      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
-      const mesh = new THREE.Mesh(cardGeo.clone(), mat);
+      const frontTex = createCardTexture(app, idx === selectedIndex);
+      const sideMat = new THREE.MeshLambertMaterial({ color: sideColor });
+      const frontMat = new THREE.MeshBasicMaterial({ map: frontTex });
+      const backMat = new THREE.MeshBasicMaterial({ map: frontTex });
+
+      // [+x, -x, +y, -y, +z(앞), -z(뒤)]
+      const materials = [sideMat, sideMat, sideMat, sideMat, frontMat, backMat];
+      const mesh = new THREE.Mesh(cardGeo.clone(), materials);
 
       if (count === 1) {
         mesh.position.set(0, 0, 1.4);
@@ -270,18 +328,38 @@ document.addEventListener('DOMContentLoaded', () => {
       targetRotationY = 0;
       return;
     }
-    targetRotationY = -(selectedIndex / count) * Math.PI * 2;
+    // 언래핑된 carouselStep으로 회전 방향 일관성 유지
+    targetRotationY = -(carouselStep / count) * Math.PI * 2;
   }
 
-  function selectIndex(idx) {
-    if (currentApps.length === 0) return;
-    selectedIndex = (idx + currentApps.length) % currentApps.length;
+  function stepCarousel(delta) {
+    const count = currentApps.length;
+    if (count === 0) return;
+    carouselStep += delta;
+    selectedIndex = ((carouselStep % count) + count) % count;
     updateTargetRotation();
     updateHud();
-    rebuildCards();
+    // 선택 테두리 갱신
+    cardMeshes.forEach((mesh, idx) => {
+      const tex = createCardTexture(currentApps[idx], idx === selectedIndex);
+      mesh.material[4].map?.dispose();
+      mesh.material[4].map = tex;
+      mesh.material[5].map = tex;
+      mesh.material[4].needsUpdate = true;
+      mesh.material[5].needsUpdate = true;
+    });
   }
 
-  // 5. 하단 HUD 업데이트
+  function jumpToIndex(targetIdx) {
+    const count = currentApps.length;
+    if (count === 0) return;
+    let diff = targetIdx - selectedIndex;
+    if (diff > count / 2) diff -= count;
+    if (diff < -count / 2) diff += count;
+    stepCarousel(diff);
+  }
+
+  // 5. 하단 HUD 업데이트 (이모티콘 제거)
   function updateHud() {
     if (currentApps.length === 0) {
       hudWrapper.classList.add('hidden');
@@ -291,18 +369,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const app = currentApps[selectedIndex];
     const isPinned = pinnedIds.includes(app.id);
 
-    hudIcon.textContent = app.icon || '🚀';
+    hudCode.textContent = app.code || 'APP';
     hudCategory.textContent = app.category;
-    hudStatus.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>${app.status}`;
+    hudStatus.innerHTML = `<span class="w-1.5 h-1.5 bg-emerald-500"></span>${app.status}`;
     hudTitle.textContent = app.name;
     hudDesc.textContent = app.description;
     hudIndex.textContent = `${selectedIndex + 1} / ${currentApps.length}`;
 
-    hudPin.textContent = isPinned ? '★' : '☆';
-    hudPin.className = `w-8 h-8 rounded-lg flex items-center justify-center text-base transition shrink-0 ${
+    hudPin.textContent = isPinned ? 'PIN' : '☆';
+    hudPin.className = `px-2 h-8 border-2 font-mono text-[11px] font-bold flex items-center justify-center transition shrink-0 ${
       isPinned
-        ? 'bg-amber-400/15 text-amber-500'
-        : 'text-slate-400 hover:text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+        ? 'bg-amber-400 border-slate-900 text-slate-900'
+        : 'border-slate-300 dark:border-slate-700 text-slate-500 hover:border-amber-400 hover:text-amber-500'
     }`;
 
     hudOpen.href = app.url;
@@ -321,9 +399,9 @@ document.addEventListener('DOMContentLoaded', () => {
       .map(cat => {
         const isActive = cat === activeCategory;
         const activeClasses = isActive
-          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-          : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-transparent hover:border-indigo-400';
-        return `<button type="button" data-category="${cat}" class="category-btn px-3.5 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap transition ${activeClasses}">${cat}</button>`;
+          ? 'bg-indigo-600 text-white border-slate-900 dark:border-indigo-300 shadow-[2px_2px_0px_0px_rgba(15,23,42,0.9)]'
+          : 'bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-indigo-400';
+        return `<button type="button" data-category="${cat}" class="category-btn px-3 py-1 text-xs font-mono font-semibold border-2 whitespace-nowrap transition ${activeClasses}">${cat}</button>`;
       })
       .join('');
 
@@ -344,13 +422,15 @@ document.addEventListener('DOMContentLoaded', () => {
       if (aPin !== bPin) return bPin - aPin;
       return (b.featured ? 1 : 0) - (a.featured ? 1 : 0);
     });
-    appCountEl.textContent = `${currentApps.length}개`;
+    appCountEl.textContent = `${currentApps.length}`;
     selectedIndex = 0;
+    carouselStep = 0;
+    currentRotationY = 0;
     rebuildCards();
     updateHud();
   }
 
-  // 7. 이벤트 바인딩 (즐겨찾기, 버튼, 드래그/터치, 레이캐스팅)
+  // 7. 이벤트 바인딩
   hudPin.addEventListener('click', () => {
     const app = currentApps[selectedIndex];
     if (!app) return;
@@ -363,15 +443,15 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshApps();
   });
 
-  prevBtn.addEventListener('click', () => selectIndex(selectedIndex - 1));
-  nextBtn.addEventListener('click', () => selectIndex(selectedIndex + 1));
+  prevBtn.addEventListener('click', () => stepCarousel(-1));
+  nextBtn.addEventListener('click', () => stepCarousel(1));
 
   window.addEventListener('keydown', e => {
-    if (e.key === 'ArrowLeft') selectIndex(selectedIndex - 1);
-    if (e.key === 'ArrowRight') selectIndex(selectedIndex + 1);
+    if (e.key === 'ArrowLeft') stepCarousel(-1);
+    if (e.key === 'ArrowRight') stepCarousel(1);
   });
 
-  // 터치/마우스 드래그 & 클릭 레이캐스팅
+  // 터치/마우스 스와이프 & 클릭 레이캐스팅
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
   let dragStartX = 0;
@@ -393,11 +473,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const dx = e.clientX - dragStartX;
 
     if (Math.abs(dx) > 40) {
-      selectIndex(dx > 0 ? selectedIndex - 1 : selectedIndex + 1);
+      // 오른쪽으로 스와이프(dx > 0) -> 이전(-1), 왼쪽으로 스와이프(dx < 0) -> 다음(+1)
+      stepCarousel(dx > 0 ? -1 : 1);
       return;
     }
 
-    // 클릭으로 카드 선택 또는 실행
     pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
     pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
@@ -407,7 +487,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (hitIdx === selectedIndex) {
         window.open(currentApps[hitIdx].url, '_blank', 'noopener,noreferrer');
       } else {
-        selectIndex(hitIdx);
+        jumpToIndex(hitIdx);
       }
     }
   });
@@ -425,13 +505,18 @@ document.addEventListener('DOMContentLoaded', () => {
     requestAnimationFrame(animate);
     const t = clock.getElapsedTime();
 
-    currentRotationY += (targetRotationY - currentRotationY) * 0.1;
-    carouselGroup.rotation.y = currentRotationY + pointerX * 0.08;
-    carouselGroup.rotation.x = -pointerY * 0.05;
+    currentRotationY += (targetRotationY - currentRotationY) * 0.12;
+    carouselGroup.rotation.y = currentRotationY + pointerX * 0.06;
+    carouselGroup.rotation.x = -pointerY * 0.04;
 
-    coreMesh.rotation.y = t * 0.18;
-    coreMesh.rotation.x = t * 0.11;
-    particles.rotation.y = t * 0.025;
+    coreGroup.rotation.y = t * 0.2;
+    coreGroup.rotation.x = t * 0.12;
+
+    voxelParticles.forEach((cube, i) => {
+      cube.rotation.x += 0.005 * cube.userData.speed;
+      cube.rotation.y += 0.007 * cube.userData.speed;
+      cube.position.y += Math.sin(t + i) * 0.0015;
+    });
 
     cardMeshes.forEach((mesh, i) => {
       mesh.position.y = Math.sin(t * 1.4 + i) * 0.06;
@@ -440,6 +525,8 @@ document.addEventListener('DOMContentLoaded', () => {
     renderer.render(scene, camera);
   }
 
+  rebuildVoxelCore();
+  rebuildVoxelParticles();
   renderCategories();
   refreshApps();
   animate();
