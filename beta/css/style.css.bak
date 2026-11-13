@@ -1,0 +1,56 @@
+@font-face {
+  font-family: 'DungGeunMo';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_six@1.2/DungGeunMo.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+}
+
+body, button, a, input, span, h1, h2, h3, p, div {
+  font-family: 'Silkscreen', 'DungGeunMo', ui-monospace, monospace;
+}
+
+/* Custom Scrollbar Hide */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* 2.5D Perspective Stage */
+.voxel-stage {
+  perspective: 1100px;
+}
+
+/* 2.5D Isometric/Perspective Grid Floor */
+.voxel-grid-plane {
+  position: absolute;
+  inset: -40%;
+  background-image:
+    linear-gradient(to right, rgba(99, 102, 241, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(99, 102, 241, 0.12) 1px, transparent 1px);
+  background-size: 40px 40px;
+  transform: perspective(700px) rotateX(55deg) translateY(var(--grid-offset, 0px));
+  transform-origin: center top;
+  mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.75) 10%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.75) 10%, transparent 75%);
+}
+
+.dark .voxel-grid-plane {
+  background-image:
+    linear-gradient(to right, rgba(129, 140, 248, 0.16) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(129, 140, 248, 0.16) 1px, transparent 1px);
+}
+
+/* 2.5D Voxel Card */
+.voxel-card {
+  transform-style: preserve-3d;
+  will-change: transform;
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.18s ease, border-color 0.18s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.voxel-card:active {
+  transform: translate3d(3px, 3px, 0) scale(0.99) !important;
+}
