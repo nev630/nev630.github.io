@@ -1,22 +1,107 @@
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+
 document.addEventListener('DOMContentLoaded', () => {
   const htmlEl = document.documentElement;
+  const waveCanvas = document.getElementById('voxel-wave-bg');
   const categoryTabsEl = document.getElementById('category-tabs');
   const appListEl = document.getElementById('app-list');
   const appCountEl = document.getElementById('app-count');
   const emptyStateEl = document.getElementById('empty-state');
-  const gridPlaneEl = document.querySelector('.voxel-grid-plane');
 
   let activeCategory = 'All';
 
   // 1. 시스템 다크 모드 자동 연동
   const darkMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-  function syncSystemTheme(isDark) {
-    htmlEl.classList.toggle('dark', isDark);
+  let isDarkMode = darkMediaQuery.matches;
+
+  function syncSystemTheme(dark) {
+    isDarkMode = dark;
+    htmlEl.classList.toggle('dark', dark);
+    updateWaveTheme();
   }
-  syncSystemTheme(darkMediaQuery.matches);
+  htmlEl.classList.toggle('dark', isDarkMode);
   darkMediaQuery.addEventListener('change', e => syncSystemTheme(e.matches));
 
-  // 2. 카테고리 탭 렌더링
+  // 2. 아이소메트릭 Voxel 웨이브 배경 (Three.js InstancedMesh)
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(34, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.set(13, 14, 13);
+  camera.lookAt(0, -1, 0);
+
+  const renderer = new THREE.WebGLRenderer({ canvas: waveCanvas, antialias: true, powerPreference: 'high-performance' });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+  // Voxel 음영용 조명
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+  scene.add(ambientLight);
+
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+  dirLight.position.set(10, 18, 8);
+  scene.add(dirLight);
+
+  const rimLight = new THREE.DirectionalLight(0x818cf8, 0.55);
+  rimLight.position.set(-10, 6, -10);
+  scene.add(rimLight);
+
+  const GRID_SIZE = 22;
+  const SPACING = 0.88;
+  const TOTAL_CUBES = GRID_SIZE * GRID_SIZE;
+  const cubeGeo = new THREE.BoxGeometry(0.76, 1.4, 0.76);
+  const cubeMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  const instancedWave = new THREE.InstancedMesh(cubeGeo, cubeMat, TOTAL_CUBES);
+  scene.add(instancedWave);
+
+  const dummy = new THREE.Object3D();
+  const tempColor = new THREE.Color();
+
+  function updateWaveTheme() {
+    const bgHex = isDarkMode ? 0x020617 : 0xf1f5f9;
+    scene.background = new THREE.Color(bgHex);
+    scene.fog = new THREE.FogExp2(bgHex, 0.036);
+
+    const palette = isDarkMode
+      ? [0x1e1b4b, 0x312e81, 0x4338ca, 0x3730a3]
+      : [0xc7d2fe, 0xa5b4fc, 0x818cf8, 0xe0e7ff];
+
+    for (let i = 0; i < TOTAL_CUBES; i++) {
+      tempColor.setHex(palette[i % palette.length]);
+      instancedWave.setColorAt(i, tempColor);
+    }
+    if (instancedWave.instanceColor) {
+      instancedWave.instanceColor.needsUpdate = true;
+    }
+  }
+  updateWaveTheme();
+
+  const clock = new THREE.Clock();
+  function animateWave() {
+    requestAnimationFrame(animateWave);
+    const t = clock.getElapsedTime() * 1.15;
+    const scrollPhase = window.scrollY * 0.007;
+    const half = (GRID_SIZE - 1) * 0.5;
+
+    let idx = 0;
+    for (let gx = 0; gx < GRID_SIZE; gx++) {
+      for (let gz = 0; gz < GRID_SIZE; gz++) {
+        const x = (gx - half) * SPACING;
+        const z = (gz - half) * SPACING;
+
+        const wave1 = Math.sin(gx * 0.38 + t + scrollPhase);
+        const wave2 = Math.cos(gz * 0.38 + t * 0.85 - scrollPhase * 0.5);
+        const y = (wave1 + wave2) * 0.45 - 1.2;
+
+        dummy.position.set(x, y, z);
+        dummy.updateMatrix();
+        instancedWave.setMatrixAt(idx++, dummy.matrix);
+      }
+    }
+    instancedWave.instanceMatrix.needsUpdate = true;
+    renderer.render(scene, camera);
+  }
+  animateWave();
+
+  // 3. 카테고리 탭 렌더링
   function renderCategories() {
     const categories = ['All', ...new Set(PORTAL_APPS.map(app => app.category))];
     categoryTabsEl.innerHTML = categories
@@ -38,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 3. 2.5D 세로 스크롤 Voxel 카드 렌더링 (repo 제목, github 주소, OPEN 버튼만 표시)
+  // 4. 2.5D 세로 스크롤 Voxel 카드 렌더링 (repo 제목 + GITHUB 버튼 + OPEN 버튼)
   function renderApps() {
     const filtered = PORTAL_APPS.filter(app => activeCategory === 'All' || app.category === activeCategory);
 
@@ -54,28 +139,28 @@ document.addEventListener('DOMContentLoaded', () => {
     appListEl.innerHTML = filtered
       .map(app => {
         return `
-          <article class="voxel-card bg-white dark:bg-slate-900 border-2 border-slate-900 dark:border-indigo-400/70 shadow-[6px_6px_0px_0px_rgba(15,23,42,0.9)] dark:shadow-[6px_6px_0px_0px_rgba(99,102,241,0.45)] p-5">
+          <article class="voxel-card bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border-2 border-slate-900 dark:border-indigo-400/70 shadow-[6px_6px_0px_0px_rgba(15,23,42,0.9)] dark:shadow-[6px_6px_0px_0px_rgba(99,102,241,0.45)] p-5">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div class="min-w-0 space-y-1.5">
-                <h2 class="text-base sm:text-lg font-bold tracking-tight truncate">${app.name}</h2>
+              <h2 class="text-base sm:text-lg font-bold tracking-tight truncate">${app.name}</h2>
+
+              <div class="flex items-center gap-2 shrink-0">
                 <a
                   href="${app.repoUrl}"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="block text-xs text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 underline underline-offset-4 truncate transition"
+                  class="px-3.5 py-2 text-xs font-bold bg-slate-100 dark:bg-slate-800 border-2 border-slate-900 dark:border-slate-600 text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 shadow-[3px_3px_0px_0px_rgba(15,23,42,0.85)] dark:shadow-[3px_3px_0px_0px_rgba(71,85,105,0.6)] text-center transition"
                 >
-                  ${app.repoUrl}
+                  GITHUB
+                </a>
+                <a
+                  href="${app.url}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="px-4 py-2 text-xs font-bold bg-indigo-600 border-2 border-slate-900 dark:border-indigo-300 text-white hover:bg-indigo-500 shadow-[3px_3px_0px_0px_rgba(15,23,42,0.9)] dark:shadow-[3px_3px_0px_0px_rgba(165,180,252,0.5)] text-center transition"
+                >
+                  OPEN
                 </a>
               </div>
-
-              <a
-                href="${app.url}"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="px-4 py-2 text-xs font-bold bg-indigo-600 border-2 border-slate-900 dark:border-indigo-300 text-white hover:bg-indigo-500 shadow-[3px_3px_0px_0px_rgba(15,23,42,0.9)] dark:shadow-[3px_3px_0px_0px_rgba(165,180,252,0.5)] text-center shrink-0 transition"
-              >
-                OPEN
-              </a>
             </div>
           </article>
         `;
@@ -86,15 +171,11 @@ document.addEventListener('DOMContentLoaded', () => {
     updateScrollDepth();
   }
 
-  // 4. 스크롤 기반 2.5D 깊이·기울기 & 데스크톱 포인터 틸트
+  // 5. 스크롤 기반 2.5D 깊이·기울기 & 데스크톱 포인터 틸트
   function updateScrollDepth() {
     const cards = appListEl.querySelectorAll('.voxel-card');
     const vh = window.innerHeight;
     const centerY = vh * 0.5;
-
-    if (gridPlaneEl) {
-      gridPlaneEl.style.setProperty('--grid-offset', `${(window.scrollY * 0.25) % 40}px`);
-    }
 
     cards.forEach(card => {
       if (card.dataset.hovered === 'true') return;
@@ -145,7 +226,13 @@ document.addEventListener('DOMContentLoaded', () => {
     { passive: true }
   );
 
-  window.addEventListener('resize', updateScrollDepth);
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    updateScrollDepth();
+  });
 
   renderCategories();
   renderApps();
