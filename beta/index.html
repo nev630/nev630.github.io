@@ -26,8 +26,8 @@
   <div class="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
     <!-- Header -->
     <header class="flex items-center justify-between gap-4 mb-6">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white font-bold text-lg flex items-center justify-center shadow-sm">
+      <div class="flex items-center gap-3.5">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white font-bold text-lg flex items-center justify-center shadow-md shadow-indigo-500/20">
           N
         </div>
         <div>
@@ -46,27 +46,27 @@
       </button>
     </header>
 
-    <!-- Search & Filter -->
-    <section class="space-y-3 mb-6">
+    <!-- Sticky Search & Filter Bar -->
+    <section class="sticky top-3 z-20 mb-6 p-3 rounded-2xl bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/90 shadow-sm space-y-2.5">
       <div class="relative">
         <input
           id="search-input"
           type="search"
           placeholder="앱 이름, 설명, 태그 검색..."
-          class="w-full px-4 py-2.5 rounded-xl bg-surface-light dark:bg-surface-dark border border-slate-200/80 dark:border-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 transition shadow-sm"
+          class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200/80 dark:border-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 transition"
         />
       </div>
 
       <div class="flex items-center justify-between gap-3">
         <div id="category-tabs" class="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5"></div>
         <div class="text-xs text-slate-500 dark:text-slate-400 shrink-0">
-          Deployed Apps <span id="app-count" class="font-semibold text-slate-700 dark:text-slate-200">0개</span>
+          Apps <span id="app-count" class="font-semibold text-indigo-600 dark:text-indigo-400">0개</span>
         </div>
       </div>
     </section>
 
-    <!-- App Grid -->
-    <main id="app-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></main>
+    <!-- Bento Grid -->
+    <main id="app-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 grid-flow-dense"></main>
 
     <!-- Empty State -->
     <div id="empty-state" class="hidden py-16 text-center rounded-2xl bg-surface-light dark:bg-surface-dark border border-dashed border-slate-200 dark:border-slate-800">
@@ -74,8 +74,9 @@
     </div>
 
     <!-- Footer -->
-    <footer class="mt-10 pt-6 border-t border-slate-200/70 dark:border-slate-800/80 text-center text-xs text-slate-400 dark:text-slate-500">
-      nev630.github.io v0.1.0-beta
+    <footer class="mt-12 pt-6 border-t border-slate-200/70 dark:border-slate-800/80 flex items-center justify-between text-xs text-slate-400 dark:text-slate-500">
+      <span>nev630.github.io</span>
+      <span>v0.2.0-beta</span>
     </footer>
   </div>
 
