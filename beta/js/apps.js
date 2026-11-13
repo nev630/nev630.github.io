@@ -8,9 +8,9 @@ const PORTAL_APPS = [
     category: 'Game',
     icon: '👑',
     url: 'https://nev630.github.io/cr-clan-manager/',
-    betaUrl: 'https://nev630.github.io/cr-clan-manager/beta/',
     repoUrl: 'https://github.com/nev630/cr-clan-manager',
     tags: ['Clash Royale', 'Dashboard', 'API'],
-    status: 'Active'
+    status: 'Active',
+    featured: true
   }
 ];
