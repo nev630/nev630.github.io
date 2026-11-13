@@ -1,398 +1,34 @@
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
-
 document.addEventListener('DOMContentLoaded', () => {
   const htmlEl = document.documentElement;
-  const canvas = document.getElementById('portal-3d');
   const categoryTabsEl = document.getElementById('category-tabs');
+  const appListEl = document.getElementById('app-list');
   const appCountEl = document.getElementById('app-count');
-  const hudWrapper = document.getElementById('hud-wrapper');
-  const hudCode = document.getElementById('hud-code');
-  const hudCategory = document.getElementById('hud-category');
-  const hudStatus = document.getElementById('hud-status');
-  const hudTitle = document.getElementById('hud-title');
-  const hudDesc = document.getElementById('hud-desc');
-  const hudPin = document.getElementById('hud-pin');
-  const hudIndex = document.getElementById('hud-index');
-  const hudRepo = document.getElementById('hud-repo');
-  const hudOpen = document.getElementById('hud-open');
-  const prevBtn = document.getElementById('prev-btn');
-  const nextBtn = document.getElementById('next-btn');
+  const emptyStateEl = document.getElementById('empty-state');
+  const gridPlaneEl = document.querySelector('.voxel-grid-plane');
 
   let activeCategory = 'All';
   let pinnedIds = JSON.parse(localStorage.getItem('portal_pins') || '[]');
-  let currentApps = [];
-  let selectedIndex = 0;
-  let carouselStep = 0; // 연속 회전용 언래핑(unwrapped) 스텝 인덱스
 
   // 1. 시스템 다크 모드 자동 연동
   const darkMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-  let isDarkMode = darkMediaQuery.matches;
-
-  function syncSystemTheme(dark) {
-    isDarkMode = dark;
-    htmlEl.classList.toggle('dark', dark);
-    if (scene) {
-      scene.background = new THREE.Color(dark ? 0x020617 : 0xf1f5f9);
-      scene.fog = new THREE.FogExp2(dark ? 0x020617 : 0xf1f5f9, 0.02);
-    }
-    rebuildVoxelCore();
-    rebuildVoxelParticles();
-    rebuildCards();
+  function syncSystemTheme(isDark) {
+    htmlEl.classList.toggle('dark', isDark);
   }
-  htmlEl.classList.toggle('dark', isDarkMode);
+  syncSystemTheme(darkMediaQuery.matches);
   darkMediaQuery.addEventListener('change', e => syncSystemTheme(e.matches));
 
-  // 2. Three.js Voxel 씬 초기화
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(isDarkMode ? 0x020617 : 0xf1f5f9);
-  scene.fog = new THREE.FogExp2(isDarkMode ? 0x020617 : 0xf1f5f9, 0.02);
-
-  const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 150);
-
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-  // Voxel 음영용 조명
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
-  scene.add(ambientLight);
-  const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
-  dirLight.position.set(5, 8, 6);
-  scene.add(dirLight);
-  const rimLight = new THREE.DirectionalLight(0x818cf8, 0.6);
-  rimLight.position.set(-5, -4, -3);
-  scene.add(rimLight);
-
-  // 배경 3D Voxel 코어 클러스터
-  const coreGroup = new THREE.Group();
-  coreGroup.position.set(0, 0.25, -1.8);
-  scene.add(coreGroup);
-
-  function rebuildVoxelCore() {
-    while (coreGroup.children.length > 0) {
-      const child = coreGroup.children[0];
-      child.geometry?.dispose();
-      child.material?.dispose();
-      coreGroup.remove(child);
-    }
-
-    const palette = isDarkMode
-      ? [0x312e81, 0x4338ca, 0x6366f1, 0x1e293b]
-      : [0xc7d2fe, 0x818cf8, 0x4f46e5, 0xe2e8f0];
-    const boxGeo = new THREE.BoxGeometry(0.42, 0.42, 0.42);
-    const edgeGeo = new THREE.EdgesGeometry(boxGeo);
-    const edgeMat = new THREE.LineBasicMaterial({
-      color: isDarkMode ? 0x818cf8 : 0x312e81,
-      transparent: true,
-      opacity: 0.35
-    });
-
-    const offsets = [
-      [0, 0, 0], [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1],
-      [1, 1, 0], [-1, -1, 0], [1, 0, -1], [-1, 0, 1]
-    ];
-
-    offsets.forEach(([ox, oy, oz], idx) => {
-      const mat = new THREE.MeshLambertMaterial({
-        color: palette[idx % palette.length],
-        transparent: true,
-        opacity: 0.45
-      });
-      const cube = new THREE.Mesh(boxGeo, mat);
-      cube.position.set(ox * 0.46, oy * 0.46, oz * 0.46);
-      const wire = new THREE.LineSegments(edgeGeo, edgeMat);
-      cube.add(wire);
-      coreGroup.add(cube);
-    });
-  }
-
-  // 배경 떠다니는 Voxel 큐브 파티클
-  const voxelParticleGroup = new THREE.Group();
-  scene.add(voxelParticleGroup);
-  let voxelParticles = [];
-
-  function rebuildVoxelParticles() {
-    voxelParticles.forEach(p => {
-      p.geometry.dispose();
-      p.material.dispose();
-      voxelParticleGroup.remove(p);
-    });
-    voxelParticles = [];
-
-    const pGeo = new THREE.BoxGeometry(0.14, 0.14, 0.14);
-    const pColors = isDarkMode ? [0x6366f1, 0x38bdf8, 0x334155] : [0x6366f1, 0x818cf8, 0x94a3b8];
-
-    for (let i = 0; i < 65; i++) {
-      const mat = new THREE.MeshLambertMaterial({
-        color: pColors[i % pColors.length],
-        transparent: true,
-        opacity: 0.55
-      });
-      const cube = new THREE.Mesh(pGeo, mat);
-      cube.position.set(
-        (Math.random() - 0.5) * 22,
-        (Math.random() - 0.5) * 14,
-        (Math.random() - 0.5) * 18 - 3
-      );
-      cube.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
-      cube.userData = { speed: 0.3 + Math.random() * 0.6 };
-      voxelParticleGroup.add(cube);
-      voxelParticles.push(cube);
-    }
-  }
-
-  // 카드 캐러셀 그룹
-  const carouselGroup = new THREE.Group();
-  scene.add(carouselGroup);
-
-  let cardMeshes = [];
-  let targetRotationY = 0;
-  let currentRotationY = 0;
-  let pointerX = 0;
-  let pointerY = 0;
-
-  // 반응형 카메라 프레이밍
-  function updateCameraFraming() {
-    const aspect = window.innerWidth / window.innerHeight;
-    camera.aspect = aspect;
-    camera.updateProjectionMatrix();
-
-    const count = currentApps.length;
-    const radius = count <= 1 ? 1.4 : Math.max(2.8, count * 0.85);
-    const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-    const minDistanceForWidth = (3.4 / 0.76) / (2 * tanHalfFov * aspect);
-    const distFromFront = Math.max(5.2, minDistanceForWidth);
-
-    camera.position.set(0, aspect < 0.8 ? 0.35 : 0.4, radius + distFromFront);
-    carouselGroup.position.set(0, aspect < 0.8 ? 0.65 : 0.25, 0);
-  }
-
-  // 3. Voxel 스타일 2D 텍스처 생성 (둥근 모서리/이모티콘 제거)
-  function createCardTexture(app, isSelected) {
-    const c = document.createElement('canvas');
-    c.width = 720;
-    c.height = 460;
-    const ctx = c.getContext('2d');
-
-    // 하드 픽셀 오프셋 그림자
-    ctx.fillStyle = isDarkMode ? '#312e81' : '#0f172a';
-    ctx.fillRect(22, 22, 686, 426);
-
-    // 메인 Voxel 카드 면
-    ctx.fillStyle = isDarkMode ? '#0f172a' : '#ffffff';
-    ctx.fillRect(10, 10, 686, 426);
-
-    // 굵은 직각 테두리
-    ctx.lineWidth = isSelected ? 8 : 4;
-    ctx.strokeStyle = isSelected ? '#6366f1' : isDarkMode ? '#334155' : '#0f172a';
-    ctx.strokeRect(10, 10, 686, 426);
-
-    // 상단 Voxel 그리드 악센트 바
-    ctx.fillStyle = isSelected ? '#6366f1' : isDarkMode ? '#1e293b' : '#e2e8f0';
-    ctx.fillRect(10, 10, 686, 18);
-
-    // 코드 배지 박스 (이모티콘 대체)
-    ctx.fillStyle = '#4f46e5';
-    ctx.fillRect(48, 56, 84, 84);
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = isDarkMode ? '#a5b4fc' : '#0f172a';
-    ctx.strokeRect(48, 56, 84, 84);
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 34px ui-monospace, monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(app.code || 'APP', 90, 100);
-
-    // 카테고리
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillStyle = '#6366f1';
-    ctx.font = 'bold 22px ui-monospace, monospace';
-    ctx.fillText(app.category.toUpperCase(), 156, 60);
-
-    // 제목
-    ctx.fillStyle = isDarkMode ? '#f8fafc' : '#0f172a';
-    ctx.font = 'bold 34px sans-serif';
-    ctx.fillText(truncateText(ctx, app.name, 500), 156, 94);
-
-    // 설명
-    ctx.fillStyle = isDarkMode ? '#94a3b8' : '#475569';
-    ctx.font = '24px sans-serif';
-    wrapText(ctx, app.description, 48, 174, 610, 34, 3);
-
-    // 직각 Voxel 태그
-    let tagX = 48;
-    const tagY = 336;
-    ctx.font = 'bold 20px ui-monospace, monospace';
-    (app.tags || []).slice(0, 4).forEach(tag => {
-      const w = ctx.measureText(tag).width + 26;
-      ctx.fillStyle = isDarkMode ? '#1e293b' : '#f1f5f9';
-      ctx.fillRect(tagX, tagY, w, 40);
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = isDarkMode ? '#475569' : '#0f172a';
-      ctx.strokeRect(tagX, tagY, w, 40);
-      ctx.fillStyle = isDarkMode ? '#e2e8f0' : '#0f172a';
-      ctx.fillText(tag, tagX + 13, tagY + 10);
-      tagX += w + 12;
-    });
-
-    const tex = new THREE.CanvasTexture(c);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 4;
-    return tex;
-  }
-
-  function truncateText(ctx, text, maxW) {
-    if (ctx.measureText(text).width <= maxW) return text;
-    let t = text;
-    while (t.length > 0 && ctx.measureText(t + '…').width > maxW) {
-      t = t.slice(0, -1);
-    }
-    return t + '…';
-  }
-
-  function wrapText(ctx, text, x, y, maxW, lineH, maxLines) {
-    const chars = [...text];
-    let line = '';
-    let lineCount = 0;
-    for (let i = 0; i < chars.length; i++) {
-      const test = line + chars[i];
-      if (ctx.measureText(test).width > maxW) {
-        if (lineCount === maxLines - 1) {
-          ctx.fillText(line.slice(0, -1) + '…', x, y + lineCount * lineH);
-          return;
-        }
-        ctx.fillText(line, x, y + lineCount * lineH);
-        line = chars[i];
-        lineCount++;
-      } else {
-        line = test;
-      }
-    }
-    if (line && lineCount < maxLines) {
-      ctx.fillText(line, x, y + lineCount * lineH);
-    }
-  }
-
-  // 4. 두께가 있는 3D Voxel 카드 배치
-  function rebuildCards() {
-    cardMeshes.forEach(m => {
-      m.geometry.dispose();
-      if (Array.isArray(m.material)) {
-        m.material.forEach(mat => {
-          mat.map?.dispose();
-          mat.dispose();
-        });
-      }
-      carouselGroup.remove(m);
-    });
-    cardMeshes = [];
-
-    const count = currentApps.length;
-    if (count === 0) return;
-
-    const radius = count === 1 ? 0 : Math.max(2.8, count * 0.85);
-    const cardGeo = new THREE.BoxGeometry(3.4, 2.18, 0.14);
-    const sideColor = isDarkMode ? 0x312e81 : 0x1e293b;
-
-    currentApps.forEach((app, idx) => {
-      const frontTex = createCardTexture(app, idx === selectedIndex);
-      const sideMat = new THREE.MeshLambertMaterial({ color: sideColor });
-      const frontMat = new THREE.MeshBasicMaterial({ map: frontTex });
-      const backMat = new THREE.MeshBasicMaterial({ map: frontTex });
-
-      // [+x, -x, +y, -y, +z(앞), -z(뒤)]
-      const materials = [sideMat, sideMat, sideMat, sideMat, frontMat, backMat];
-      const mesh = new THREE.Mesh(cardGeo.clone(), materials);
-
-      if (count === 1) {
-        mesh.position.set(0, 0, 1.4);
-      } else {
-        const angle = (idx / count) * Math.PI * 2;
-        mesh.position.set(Math.sin(angle) * radius, 0, Math.cos(angle) * radius);
-        mesh.rotation.y = angle;
-      }
-      mesh.userData = { index: idx, app };
-      carouselGroup.add(mesh);
-      cardMeshes.push(mesh);
-    });
-
-    updateTargetRotation();
-    updateCameraFraming();
-  }
-
-  function updateTargetRotation() {
-    const count = currentApps.length;
-    if (count <= 1) {
-      targetRotationY = 0;
-      return;
-    }
-    // 언래핑된 carouselStep으로 회전 방향 일관성 유지
-    targetRotationY = -(carouselStep / count) * Math.PI * 2;
-  }
-
-  function stepCarousel(delta) {
-    const count = currentApps.length;
-    if (count === 0) return;
-    carouselStep += delta;
-    selectedIndex = ((carouselStep % count) + count) % count;
-    updateTargetRotation();
-    updateHud();
-    // 선택 테두리 갱신
-    cardMeshes.forEach((mesh, idx) => {
-      const tex = createCardTexture(currentApps[idx], idx === selectedIndex);
-      mesh.material[4].map?.dispose();
-      mesh.material[4].map = tex;
-      mesh.material[5].map = tex;
-      mesh.material[4].needsUpdate = true;
-      mesh.material[5].needsUpdate = true;
-    });
-  }
-
-  function jumpToIndex(targetIdx) {
-    const count = currentApps.length;
-    if (count === 0) return;
-    let diff = targetIdx - selectedIndex;
-    if (diff > count / 2) diff -= count;
-    if (diff < -count / 2) diff += count;
-    stepCarousel(diff);
-  }
-
-  // 5. 하단 HUD 업데이트 (이모티콘 제거)
-  function updateHud() {
-    if (currentApps.length === 0) {
-      hudWrapper.classList.add('hidden');
-      return;
-    }
-    hudWrapper.classList.remove('hidden');
-    const app = currentApps[selectedIndex];
-    const isPinned = pinnedIds.includes(app.id);
-
-    hudCode.textContent = app.code || 'APP';
-    hudCategory.textContent = app.category;
-    hudStatus.innerHTML = `<span class="w-1.5 h-1.5 bg-emerald-500"></span>${app.status}`;
-    hudTitle.textContent = app.name;
-    hudDesc.textContent = app.description;
-    hudIndex.textContent = `${selectedIndex + 1} / ${currentApps.length}`;
-
-    hudPin.textContent = isPinned ? 'PIN' : '☆';
-    hudPin.className = `px-2 h-8 border-2 font-mono text-[11px] font-bold flex items-center justify-center transition shrink-0 ${
-      isPinned
-        ? 'bg-amber-400 border-slate-900 text-slate-900'
-        : 'border-slate-300 dark:border-slate-700 text-slate-500 hover:border-amber-400 hover:text-amber-500'
-    }`;
-
-    hudOpen.href = app.url;
-    if (app.repoUrl) {
-      hudRepo.href = app.repoUrl;
-      hudRepo.classList.remove('hidden');
+  // 2. 즐겨찾기 토글
+  function togglePin(appId) {
+    if (pinnedIds.includes(appId)) {
+      pinnedIds = pinnedIds.filter(id => id !== appId);
     } else {
-      hudRepo.classList.add('hidden');
+      pinnedIds.push(appId);
     }
+    localStorage.setItem('portal_pins', JSON.stringify(pinnedIds));
+    renderApps();
   }
 
-  // 6. 카테고리 & 데이터 갱신
+  // 3. 카테고리 탭 렌더링
   function renderCategories() {
     const categories = ['All', ...new Set(PORTAL_APPS.map(app => app.category))];
     categoryTabsEl.innerHTML = categories
@@ -409,125 +45,180 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.addEventListener('click', () => {
         activeCategory = btn.dataset.category;
         renderCategories();
-        refreshApps();
+        renderApps();
       });
     });
   }
 
-  function refreshApps() {
+  // 4. 2.5D 세로 스크롤 Voxel 카드 렌더링
+  function renderApps() {
     const filtered = PORTAL_APPS.filter(app => activeCategory === 'All' || app.category === activeCategory);
-    currentApps = [...filtered].sort((a, b) => {
+
+    const sorted = [...filtered].sort((a, b) => {
       const aPin = pinnedIds.includes(a.id) ? 1 : 0;
       const bPin = pinnedIds.includes(b.id) ? 1 : 0;
       if (aPin !== bPin) return bPin - aPin;
       return (b.featured ? 1 : 0) - (a.featured ? 1 : 0);
     });
-    appCountEl.textContent = `${currentApps.length}`;
-    selectedIndex = 0;
-    carouselStep = 0;
-    currentRotationY = 0;
-    rebuildCards();
-    updateHud();
-  }
 
-  // 7. 이벤트 바인딩
-  hudPin.addEventListener('click', () => {
-    const app = currentApps[selectedIndex];
-    if (!app) return;
-    if (pinnedIds.includes(app.id)) {
-      pinnedIds = pinnedIds.filter(id => id !== app.id);
-    } else {
-      pinnedIds.push(app.id);
-    }
-    localStorage.setItem('portal_pins', JSON.stringify(pinnedIds));
-    refreshApps();
-  });
+    appCountEl.textContent = `${sorted.length}`;
 
-  prevBtn.addEventListener('click', () => stepCarousel(-1));
-  nextBtn.addEventListener('click', () => stepCarousel(1));
-
-  window.addEventListener('keydown', e => {
-    if (e.key === 'ArrowLeft') stepCarousel(-1);
-    if (e.key === 'ArrowRight') stepCarousel(1);
-  });
-
-  // 터치/마우스 스와이프 & 클릭 레이캐스팅
-  const raycaster = new THREE.Raycaster();
-  const pointer = new THREE.Vector2();
-  let dragStartX = 0;
-  let isDragging = false;
-
-  canvas.addEventListener('pointerdown', e => {
-    dragStartX = e.clientX;
-    isDragging = true;
-  });
-
-  canvas.addEventListener('pointermove', e => {
-    pointerX = (e.clientX / window.innerWidth) * 2 - 1;
-    pointerY = -(e.clientY / window.innerHeight) * 2 + 1;
-  });
-
-  canvas.addEventListener('pointerup', e => {
-    if (!isDragging) return;
-    isDragging = false;
-    const dx = e.clientX - dragStartX;
-
-    if (Math.abs(dx) > 40) {
-      // 오른쪽으로 스와이프(dx > 0) -> 이전(-1), 왼쪽으로 스와이프(dx < 0) -> 다음(+1)
-      stepCarousel(dx > 0 ? -1 : 1);
+    if (sorted.length === 0) {
+      appListEl.innerHTML = '';
+      emptyStateEl.classList.remove('hidden');
       return;
     }
 
-    pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
-    pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
-    raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObjects(cardMeshes);
-    if (hits.length > 0) {
-      const hitIdx = hits[0].object.userData.index;
-      if (hitIdx === selectedIndex) {
-        window.open(currentApps[hitIdx].url, '_blank', 'noopener,noreferrer');
-      } else {
-        jumpToIndex(hitIdx);
-      }
-    }
-  });
+    emptyStateEl.classList.add('hidden');
+    appListEl.innerHTML = sorted
+      .map(app => {
+        const isPinned = pinnedIds.includes(app.id);
+        const isFeatured = Boolean(app.featured);
 
-  // 반응형 리사이즈
-  window.addEventListener('resize', () => {
-    updateCameraFraming();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  });
+        const tagsHtml = (app.tags || [])
+          .map(
+            tag =>
+              `<span class="px-2 py-0.5 text-[11px] font-mono font-medium bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300">${tag}</span>`
+          )
+          .join('');
 
-  // 애니메이션 루프
-  const clock = new THREE.Clock();
-  function animate() {
-    requestAnimationFrame(animate);
-    const t = clock.getElapsedTime();
+        const repoLinkHtml = app.repoUrl
+          ? `<a href="${app.repoUrl}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 text-xs font-mono font-semibold bg-slate-100 dark:bg-slate-800 border-2 border-slate-900 dark:border-slate-600 text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition">GitHub</a>`
+          : '';
 
-    currentRotationY += (targetRotationY - currentRotationY) * 0.12;
-    carouselGroup.rotation.y = currentRotationY + pointerX * 0.06;
-    carouselGroup.rotation.x = -pointerY * 0.04;
+        const featuredBadge = isFeatured
+          ? `<span class="px-1.5 py-0.5 bg-indigo-600 text-white text-[10px] font-mono font-bold">FEATURED</span>`
+          : '';
 
-    coreGroup.rotation.y = t * 0.2;
-    coreGroup.rotation.x = t * 0.12;
+        const cardBorder = isFeatured
+          ? 'border-indigo-600 dark:border-indigo-400 shadow-[6px_6px_0px_0px_rgba(79,70,229,0.85)] dark:shadow-[6px_6px_0px_0px_rgba(99,102,241,0.55)]'
+          : 'border-slate-900 dark:border-slate-700 shadow-[5px_5px_0px_0px_rgba(15,23,42,0.9)] dark:shadow-[5px_5px_0px_0px_rgba(51,65,85,0.7)]';
 
-    voxelParticles.forEach((cube, i) => {
-      cube.rotation.x += 0.005 * cube.userData.speed;
-      cube.rotation.y += 0.007 * cube.userData.speed;
-      cube.position.y += Math.sin(t + i) * 0.0015;
+        return `
+          <article class="voxel-card bg-white dark:bg-slate-900 border-2 ${cardBorder} p-5">
+            <!-- 상단 Voxel 악센트 스트립 -->
+            <div class="h-1.5 w-full ${isFeatured ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-800'} mb-4"></div>
+
+            <div class="flex items-start justify-between gap-3 mb-3">
+              <div class="flex items-center gap-3.5 min-w-0">
+                <div class="w-12 h-12 bg-indigo-600 text-white font-mono font-bold text-sm border-2 border-slate-900 dark:border-indigo-300 shadow-[3px_3px_0px_0px_rgba(15,23,42,0.85)] flex items-center justify-center shrink-0">
+                  ${app.code || 'APP'}
+                </div>
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-1.5 mb-0.5">
+                    <span class="text-[11px] font-mono font-bold uppercase text-indigo-600 dark:text-indigo-400">${app.category}</span>
+                    ${featuredBadge}
+                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 border border-emerald-600/40 bg-emerald-500/10 text-[10px] font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                      <span class="w-1.5 h-1.5 bg-emerald-500"></span>${app.status}
+                    </span>
+                  </div>
+                  <h2 class="text-base sm:text-lg font-bold leading-snug truncate">${app.name}</h2>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                data-pin="${app.id}"
+                aria-label="즐겨찾기"
+                class="pin-btn px-2 h-8 border-2 font-mono text-[11px] font-bold flex items-center justify-center transition shrink-0 ${
+                  isPinned
+                    ? 'bg-amber-400 border-slate-900 text-slate-900'
+                    : 'border-slate-300 dark:border-slate-700 text-slate-500 hover:border-amber-400 hover:text-amber-500'
+                }"
+              >
+                ${isPinned ? 'PIN' : '☆'}
+              </button>
+            </div>
+
+            <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
+              ${app.description}
+            </p>
+
+            <div class="pt-3.5 border-t-2 border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2.5">
+              <div class="flex flex-wrap gap-1.5">
+                ${tagsHtml}
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                ${repoLinkHtml}
+                <a href="${app.url}" target="_blank" rel="noopener noreferrer" class="px-3.5 py-1.5 text-xs font-mono font-bold bg-indigo-600 border-2 border-slate-900 dark:border-indigo-300 text-white hover:bg-indigo-500 shadow-[2px_2px_0px_0px_rgba(15,23,42,0.9)] dark:shadow-[2px_2px_0px_0px_rgba(165,180,252,0.5)] transition">
+                  OPEN
+                </a>
+              </div>
+            </div>
+          </article>
+        `;
+      })
+      .join('');
+
+    appListEl.querySelectorAll('.pin-btn').forEach(btn => {
+      btn.addEventListener('click', () => togglePin(btn.dataset.pin));
     });
 
-    cardMeshes.forEach((mesh, i) => {
-      mesh.position.y = Math.sin(t * 1.4 + i) * 0.06;
-    });
-
-    renderer.render(scene, camera);
+    attachCard25DEffects();
+    updateScrollDepth();
   }
 
-  rebuildVoxelCore();
-  rebuildVoxelParticles();
+  // 5. 스크롤 기반 2.5D 깊이·기울기 & 데스크톱 포인터 틸트
+  function updateScrollDepth() {
+    const cards = appListEl.querySelectorAll('.voxel-card');
+    const vh = window.innerHeight;
+    const centerY = vh * 0.5;
+
+    if (gridPlaneEl) {
+      gridPlaneEl.style.setProperty('--grid-offset', `${(window.scrollY * 0.25) % 40}px`);
+    }
+
+    cards.forEach(card => {
+      if (card.dataset.hovered === 'true') return;
+      const rect = card.getBoundingClientRect();
+      const cardCenter = rect.top + rect.height * 0.5;
+      const norm = Math.max(-1, Math.min(1, (cardCenter - centerY) / (vh * 0.65)));
+
+      const rotateX = (-norm * 7).toFixed(2);
+      const scale = (1 - Math.abs(norm) * 0.035).toFixed(3);
+      const translateZ = (-Math.abs(norm) * 24).toFixed(1);
+
+      card.style.transform = `translate3d(0, 0, ${translateZ}px) rotateX(${rotateX}deg) scale(${scale})`;
+    });
+  }
+
+  function attachCard25DEffects() {
+    const isTouch = window.matchMedia('(pointer: coarse)').matches;
+    if (isTouch) return;
+
+    appListEl.querySelectorAll('.voxel-card').forEach(card => {
+      card.addEventListener('mousemove', e => {
+        card.dataset.hovered = 'true';
+        const rect = card.getBoundingClientRect();
+        const x = (e.clientX - rect.left) / rect.width - 0.5;
+        const y = (e.clientY - rect.top) / rect.height - 0.5;
+        card.style.transform = `translate3d(0, -3px, 12px) rotateX(${(-y * 8).toFixed(2)}deg) rotateY(${(x * 8).toFixed(2)}deg)`;
+      });
+
+      card.addEventListener('mouseleave', () => {
+        card.dataset.hovered = 'false';
+        updateScrollDepth();
+      });
+    });
+  }
+
+  let scrollTicking = false;
+  window.addEventListener(
+    'scroll',
+    () => {
+      if (!scrollTicking) {
+        requestAnimationFrame(() => {
+          updateScrollDepth();
+          scrollTicking = false;
+        });
+        scrollTicking = true;
+      }
+    },
+    { passive: true }
+  );
+
+  window.addEventListener('resize', updateScrollDepth);
+
   renderCategories();
-  refreshApps();
-  animate();
+  renderApps();
 });
