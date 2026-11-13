@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     htmlEl.classList.toggle('dark', dark);
     if (scene) {
       scene.background = new THREE.Color(dark ? 0x020617 : 0xf8fafc);
-      scene.fog = new THREE.FogExp2(dark ? 0x020617 : 0xf8fafc, 0.045);
+      scene.fog = new THREE.FogExp2(dark ? 0x020617 : 0xf8fafc, 0.022);
     }
     if (coreWireMaterial) {
       coreWireMaterial.color.setHex(dark ? 0x6366f1 : 0x4f46e5);
@@ -48,10 +48,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // 2. Three.js 씬 초기화
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(isDarkMode ? 0x020617 : 0xf8fafc);
-  scene.fog = new THREE.FogExp2(isDarkMode ? 0x020617 : 0xf8fafc, 0.045);
+  scene.fog = new THREE.FogExp2(isDarkMode ? 0x020617 : 0xf8fafc, 0.022);
 
-  const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 100);
-  camera.position.set(0, 0.4, 7.2);
+  const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 150);
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -80,15 +79,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const particleCount = 180;
   const particlePositions = new Float32Array(particleCount * 3);
   for (let i = 0; i < particleCount; i++) {
-    particlePositions[i * 3] = (Math.random() - 0.5) * 22;
-    particlePositions[i * 3 + 1] = (Math.random() - 0.5) * 14;
-    particlePositions[i * 3 + 2] = (Math.random() - 0.5) * 18 - 2;
+    particlePositions[i * 3] = (Math.random() - 0.5) * 24;
+    particlePositions[i * 3 + 1] = (Math.random() - 0.5) * 16;
+    particlePositions[i * 3 + 2] = (Math.random() - 0.5) * 20 - 2;
   }
   const particleGeo = new THREE.BufferGeometry();
   particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
   const particleMaterial = new THREE.PointsMaterial({
     color: isDarkMode ? 0x818cf8 : 0x6366f1,
-    size: 0.055,
+    size: 0.065,
     transparent: true,
     opacity: 0.55
   });
@@ -97,7 +96,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 카드 캐러셀 그룹
   const carouselGroup = new THREE.Group();
-  carouselGroup.position.set(0, 0.2, 0);
   scene.add(carouselGroup);
 
   let cardMeshes = [];
@@ -105,6 +103,22 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentRotationY = 0;
   let pointerX = 0;
   let pointerY = 0;
+
+  // 반응형 카메라 프레이밍 (모바일 세로 화면에서 카드가 잘리지 않도록 거리 자동 조절)
+  function updateCameraFraming() {
+    const aspect = window.innerWidth / window.innerHeight;
+    camera.aspect = aspect;
+    camera.updateProjectionMatrix();
+
+    const count = currentApps.length;
+    const radius = count <= 1 ? 1.4 : Math.max(2.8, count * 0.85);
+    const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    const minDistanceForWidth = (3.4 / 0.76) / (2 * tanHalfFov * aspect);
+    const distFromFront = Math.max(5.2, minDistanceForWidth);
+
+    camera.position.set(0, aspect < 0.8 ? 0.35 : 0.4, radius + distFromFront);
+    carouselGroup.position.set(0, aspect < 0.8 ? 0.65 : 0.25, 0);
+  }
 
   // 3. CanvasTexture로 선명한 3D 앱 카드 텍스처 생성
   function createCardTexture(app, isSelected) {
@@ -134,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx.textBaseline = 'middle';
     ctx.fillText(app.icon || '🚀', 96, 98);
 
-    // 카테고리 & 상태
+    // 카테고리
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillStyle = '#6366f1';
@@ -247,6 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     updateTargetRotation();
+    updateCameraFraming();
   }
 
   function updateTargetRotation() {
@@ -399,8 +414,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 반응형 리사이즈
   window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
+    updateCameraFraming();
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   });
