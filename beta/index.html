@@ -3,24 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>nev630 // Web App Portal</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' fill='%23F4F3EE'/%3E%3Crect x='1' y='1' width='14' height='14' fill='%231A1D21'/%3E%3Crect x='2' y='2' width='12' height='12' fill='%23FAF9F5'/%3E%3Crect x='4' y='4' width='8' height='8' fill='%231D4ED8'/%3E%3Crect x='5' y='5' width='6' height='6' fill='%23FAF9F5'/%3E%3Crect x='6' y='6' width='4' height='4' fill='%23E05A2B'/%3E%3C/svg%3E" />
+  <title>pages-portal</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' fill='%230f172a'/%3E%3Crect x='2' y='1' width='12' height='14' fill='%234f46e5'/%3E%3Crect x='4' y='3' width='8' height='10' fill='%236366f1'/%3E%3Crect x='5' y='4' width='6' height='8' fill='%23a5b4fc'/%3E%3Crect x='6' y='6' width='4' height='4' fill='%2338bdf8'/%3E%3Crect x='7' y='7' width='2' height='2' fill='%23ffffff'/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+KR:wght@400;500;700&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
+      darkMode: 'class',
       theme: {
         extend: {
           colors: {
-            paper: '#F4F3EE',
-            panel: '#FAF9F5',
-            recessed: '#E8E6DF',
-            ink: '#1A1D21',
-            muted: '#525866',
-            cobalt: '#1D4ED8',
-            signal: '#E05A2B',
+            surface: {
+              light: '#ffffff',
+              dark: '#0f172a',
+            },
           },
         },
       },
@@ -28,77 +26,29 @@
   </script>
   <link rel="stylesheet" href="css/style.css" />
 </head>
-<body class="min-h-screen blueprint-bg text-ink antialiased overflow-x-hidden">
-  <div class="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-    <!-- Top Hardware Manual Header -->
-    <header class="mb-6 bg-panel border-2 border-ink shadow-[5px_5px_0px_0px_#1A1D21]">
-      <!-- Instrument Spec Strip -->
-      <div class="px-4 py-1.5 bg-recessed border-b-2 border-ink flex flex-wrap items-center justify-between gap-2 text-[11px] font-pixel tracking-wider text-muted">
-        <div class="flex items-center gap-2">
-          <span class="inline-block w-2 h-2 bg-emerald-500 border border-ink" aria-hidden="true"></span>
-          <span>SYS: NEV630-PORTAL</span>
-        </div>
-        <div class="flex items-center gap-3">
-          <span>REV: BETA</span>
-          <span class="hidden sm:inline text-ink/40">|</span>
-          <span class="hidden sm:inline">HOST: GITHUB PAGES</span>
-        </div>
-      </div>
+<body class="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased overflow-x-hidden">
+  <!-- Isometric Voxel Wave Background Canvas -->
+  <canvas id="voxel-wave-bg" aria-hidden="true" class="fixed inset-0 w-full h-full pointer-events-none z-0"></canvas>
 
-      <!-- Portal Identity & One-line Intro -->
-      <div class="p-5 sm:p-6">
-        <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-          <div>
-            <p class="font-pixel text-[11px] text-signal tracking-widest mb-1">WEB APP LAUNCHER &amp; SHOWCASE</p>
-            <h1 class="font-pixel text-2xl sm:text-3xl font-bold tracking-tight text-ink">
-              NEV630.GITHUB.IO
-            </h1>
-          </div>
-          <span class="font-mono-tech text-[11px] px-2.5 py-1 bg-recessed border border-ink text-ink self-start sm:self-auto">
-            CLICK CARD TO LAUNCH
-          </span>
-        </div>
-        <p class="mt-3 font-sans-body text-sm sm:text-[15px] text-muted leading-relaxed">
-          직접 설계하고 배포한 게임·유틸리티 웹 앱을 한눈에 살펴보고 바로 실행할 수 있는 포털입니다.
-        </p>
-      </div>
-    </header>
-
-    <!-- Sticky Retro Instrument Filter Bar -->
-    <section class="sticky top-3 z-20 mb-7 px-3.5 py-2.5 bg-panel/95 backdrop-blur-sm border-2 border-ink shadow-[4px_4px_0px_0px_#1A1D21] flex items-center justify-between gap-3">
+  <div class="relative z-10 max-w-2xl mx-auto px-4 sm:px-6 py-5 sm:py-8">
+    <!-- Sticky Voxel Category Filter Bar -->
+    <section class="sticky top-3 z-20 mb-7 px-3 py-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-2 border-slate-900 dark:border-indigo-400/70 shadow-[4px_4px_0px_0px_rgba(15,23,42,0.9)] dark:shadow-[4px_4px_0px_0px_rgba(99,102,241,0.45)] flex items-center justify-between gap-3">
       <div id="category-tabs" class="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5"></div>
-
-      <!-- Instrument Counter Readout -->
-      <div class="shrink-0 flex items-center gap-2 px-2.5 py-1 bg-ink text-paper border border-ink font-pixel text-xs">
-        <span class="text-paper/70">APPS</span>
-        <span id="app-count" class="font-bold text-emerald-400">0</span>
+      <div class="text-xs text-slate-600 dark:text-slate-300 shrink-0">
+        APPS <span id="app-count" class="font-bold text-indigo-600 dark:text-indigo-400">0</span>
       </div>
     </section>
 
-    <!-- Responsive App Showcase Grid -->
-    <main id="app-list" class="grid grid-cols-1 md:grid-cols-2 gap-6 pb-12"></main>
+    <!-- 2.5D Vertical Scroll App List -->
+    <main id="app-list" class="voxel-stage space-y-6 pb-12"></main>
 
     <!-- Empty State -->
-    <div id="empty-state" class="hidden py-16 px-4 text-center bg-panel border-2 border-dashed border-ink/50 shadow-[4px_4px_0px_0px_rgba(26,29,33,0.18)]">
-      <p class="font-pixel text-sm text-ink mb-1">NO MATCHING APPS</p>
-      <p class="font-sans-body text-xs text-muted">선택한 카테고리에 등록된 앱이 없습니다.</p>
+    <div id="empty-state" class="hidden py-16 text-center bg-white dark:bg-slate-900 border-2 border-dashed border-slate-400 dark:border-slate-700 text-sm text-slate-500 dark:text-slate-400">
+      NO MATCHING APPS
     </div>
-
-    <!-- Schematic Footer -->
-    <footer class="pt-4 border-t-2 border-ink/15 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] font-mono-tech text-muted">
-      <span>PORTAL // LIGHT RETRO-ENGINEERING UI</span>
-      <a
-        href="https://github.com/nev630/nev630.github.io"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="hover:text-cobalt underline underline-offset-4 transition-colors"
-      >
-        github.com/nev630/nev630.github.io
-      </a>
-    </footer>
   </div>
 
   <script src="js/apps.js"></script>
-  <script src="js/app.js"></script>
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>
