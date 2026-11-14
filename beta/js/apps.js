@@ -14,12 +14,5 @@ const PORTAL_APPS = [
     category: 'Utility',
     url: 'https://nev630.github.io/pw-generator/',
     repoUrl: 'https://github.com/nev630/pw-generator'
-  },
-  {
-    id: 'cr-donation-tracker',
-    name: 'cr-donation-tracker',
-    category: 'Game',
-    url: 'https://nev630.github.io/cr-donation-tracker/',
-    repoUrl: 'https://github.com/nev630/cr-donation-tracker'
   }
 ];
