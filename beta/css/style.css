@@ -5,17 +5,8 @@
   font-style: normal;
 }
 
-/* Typography Pairing: Pixel Headers/Labels + Clean Monospace/Sans Body */
-.font-pixel {
+body, button, a, input, span, h1, h2, h3, p, div {
   font-family: 'Silkscreen', 'DungGeunMo', ui-monospace, monospace;
-}
-
-.font-mono-tech {
-  font-family: 'JetBrains Mono', 'Noto Sans KR', ui-monospace, monospace;
-}
-
-.font-sans-body {
-  font-family: 'Noto Sans KR', 'JetBrains Mono', system-ui, sans-serif;
 }
 
 /* Custom Scrollbar Hide */
@@ -27,68 +18,39 @@
   scrollbar-width: none;
 }
 
-/* Light Retro-Engineering Blueprint Grid Background */
-.blueprint-bg {
-  background-color: #F4F3EE;
-  background-image:
-    linear-gradient(to right, rgba(29, 78, 216, 0.08) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(29, 78, 216, 0.08) 1px, transparent 1px),
-    linear-gradient(to right, rgba(26, 29, 33, 0.045) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(26, 29, 33, 0.045) 1px, transparent 1px);
-  background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px;
-  background-position: -1px -1px;
+/* 2.5D Perspective Stage */
+.voxel-stage {
+  perspective: 1100px;
 }
 
-/* Tactile Hardware Switch / Button */
-.hw-btn {
-  box-shadow: 3px 3px 0px 0px #1A1D21;
-  transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease, color 0.12s ease;
+/* 2.5D Isometric/Perspective Grid Floor */
+.voxel-grid-plane {
+  position: absolute;
+  inset: -40%;
+  background-image:
+    linear-gradient(to right, rgba(99, 102, 241, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(99, 102, 241, 0.12) 1px, transparent 1px);
+  background-size: 40px 40px;
+  transform: perspective(700px) rotateX(55deg) translateY(var(--grid-offset, 0px));
+  transform-origin: center top;
+  mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.75) 10%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.75) 10%, transparent 75%);
+}
+
+.dark .voxel-grid-plane {
+  background-image:
+    linear-gradient(to right, rgba(129, 140, 248, 0.16) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(129, 140, 248, 0.16) 1px, transparent 1px);
+}
+
+/* 2.5D Voxel Card */
+.voxel-card {
+  transform-style: preserve-3d;
+  will-change: transform;
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.18s ease, border-color 0.18s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
-.hw-btn:hover {
-  transform: translate(-1px, -1px);
-  box-shadow: 4px 4px 0px 0px #1A1D21;
-}
-
-.hw-btn:active,
-.hw-btn-active {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0px 0px #1A1D21;
-}
-
-/* Tactile Hardware App Card */
-.hw-card {
-  box-shadow: 5px 5px 0px 0px #1A1D21;
-  transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.15s ease, border-color 0.15s ease;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.hw-card:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: 7px 7px 0px 0px #1A1D21;
-}
-
-.hw-card:active {
-  transform: translate(3px, 3px);
-  box-shadow: 2px 2px 0px 0px #1A1D21;
-}
-
-/* Thumbnail Blueprint Pattern & Subtle Scanlines */
-.thumb-blueprint {
-  background-color: #E8E6DF;
-  background-image:
-    linear-gradient(to right, rgba(29, 78, 216, 0.09) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(29, 78, 216, 0.09) 1px, transparent 1px);
-  background-size: 16px 16px;
-}
-
-.scanline-overlay {
-  background: repeating-linear-gradient(
-    to bottom,
-    transparent 0px,
-    transparent 3px,
-    rgba(26, 29, 33, 0.03) 3px,
-    rgba(26, 29, 33, 0.03) 4px
-  );
+.voxel-card:active {
+  transform: translate3d(3px, 3px, 0) scale(0.99) !important;
 }
